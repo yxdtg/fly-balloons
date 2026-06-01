@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>放飞气球</title>
+    <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #FF6B35;
+            --text: #f0e6d3;
+            --text-muted: #a89b8c;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #0a0a1a; font-family: 'Noto Sans SC', sans-serif; touch-action: none; }
+        canvas { display: block; }
+
+        #controls {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(20,18,30,0.85); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,107,53,0.25); border-radius: 20px;
+            padding: 16px 22px; display: flex; align-items: flex-end; gap: 12px;
+            z-index: 10; box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            width: auto; max-width: calc(100vw - 32px);
+        }
+        #controls.hidden { transform: translateX(-50%) translateY(140%); opacity: 0; pointer-events: none; }
+        .input-group { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+        .input-group label { font-size: 10px; color: var(--text-muted); font-weight: 500; letter-spacing: 0.5px; }
+        #wishInput {
+            background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px; padding: 8px 12px; color: var(--text); font-size: 14px;
+            font-family: 'ZCOOL KuaiLe', cursive; outline: none; width: 140px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        #wishInput:focus { border-color: var(--accent); box-shadow: 0 0 12px rgba(255,107,53,0.15); }
+        #wishInput::placeholder { color: rgba(255,255,255,0.2); font-size: 12px; }
+        #colorPicker {
+            width: 40px; height: 40px; border: 2px solid rgba(255,255,255,0.12);
+            border-radius: 10px; cursor: pointer; background: none; padding: 2px;
+            transition: border-color 0.3s; flex-shrink: 0;
+        }
+        #colorPicker:hover { border-color: rgba(255,255,255,0.3); }
+        #colorPicker::-webkit-color-swatch-wrapper { padding: 0; }
+        #colorPicker::-webkit-color-swatch { border: none; border-radius: 6px; }
+
+        #releaseBtn {
+            background: linear-gradient(135deg, var(--accent), #e8521a);
+            border: none; border-radius: 12px; padding: 10px 20px; color: #fff;
+            font-size: 15px; font-family: 'ZCOOL KuaiLe', cursive; cursor: pointer;
+            transition: all 0.3s; box-shadow: 0 4px 18px rgba(255,107,53,0.35);
+            white-space: nowrap; flex-shrink: 0;
+        }
+        #releaseBtn:hover { transform: translateY(-2px) scale(1.03); box-shadow: 0 6px 24px rgba(255,107,53,0.5); }
+        #releaseBtn:active { transform: translateY(0) scale(0.98); }
+
+        #heightPanel {
+            position: fixed; top: 6%; left: 50%;
+            transform: translateX(-50%) scale(0.8);
+            z-index: 10; text-align: center;
+            opacity: 0; pointer-events: none;
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #heightPanel.visible { opacity: 1; transform: translateX(-50%) scale(1); }
+        #heightPanel .value {
+            font-size: 38px; font-weight: 700; color: #fff;
+            font-family: 'ZCOOL KuaiLe', cursive; line-height: 1;
+            text-shadow: 0 2px 20px rgba(0,0,0,0.5), 0 0 40px rgba(255,107,53,0.15);
+        }
+        #heightPanel .unit {
+            font-size: 13px; color: rgba(255,255,255,0.55);
+            font-family: 'ZCOOL KuaiLe', cursive; margin-top: 2px;
+            text-shadow: 0 1px 8px rgba(0,0,0,0.5);
+        }
+
+        #wishPopup {
+            position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.7);
+            background: rgba(255,107,53,0.12); backdrop-filter: blur(28px);
+            border: 1px solid rgba(255,107,53,0.25); border-radius: 24px;
+            padding: 28px 36px; z-index: 12; text-align: center;
+            opacity: 0; pointer-events: none;
+            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+            max-width: calc(100vw - 40px);
+        }
+        #wishPopup.visible { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        #wishPopup .wish-text { font-size: 22px; color: var(--text); font-family: 'ZCOOL KuaiLe', cursive; margin-bottom: 8px; }
+        #wishPopup .wish-sub { font-size: 14px; color: var(--text); font-family: 'ZCOOL KuaiLe', cursive; line-height: 1.6; }
+
+        #resetBtn {
+            position: fixed; bottom: 20px; left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: rgba(20,18,30,0.85); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,107,53,0.25); border-radius: 14px;
+            padding: 12px 28px; color: var(--text); font-size: 14px;
+            font-family: 'ZCOOL KuaiLe', cursive; cursor: pointer;
+            z-index: 10; transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            opacity: 0; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        #resetBtn.visible { transform: translateX(-50%) translateY(0); opacity: 1; }
+        #resetBtn:hover { border-color: var(--accent); background: rgba(255,107,53,0.1); }
+
+        @media (max-width: 480px) {
+            #controls {
+                flex-wrap: wrap; justify-content: center; gap: 10px;
+                padding: 14px 16px; bottom: 12px; border-radius: 16px;
+            }
+            #wishInput { width: 120px; font-size: 13px; padding: 7px 10px; }
+            #colorPicker { width: 36px; height: 36px; }
+            #releaseBtn { padding: 9px 18px; font-size: 14px; }
+            #heightPanel .value { font-size: 28px; }
+            #heightPanel .unit { font-size: 11px; }
+            #wishPopup { padding: 22px 28px; }
+            #wishPopup .wish-text { font-size: 18px; }
+            #wishPopup .wish-sub { font-size: 12px; }
+            #resetBtn { padding: 10px 24px; font-size: 13px; bottom: 12px; }
+        }
+
+        @media (max-width: 360px) {
+            #wishInput { width: 100px; font-size: 12px; }
+            #heightPanel .value { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="controls">
+        <div class="input-group">
+            <label>写下心愿</label>
+            <input type="text" id="wishInput" placeholder="输入你的心愿..." maxlength="16">
+        </div>
+        <div class="input-group">
+            <label>气球颜色</label>
+            <input type="color" id="colorPicker" value="#FF6B35">
+        </div>
+        <button id="releaseBtn">放飞</button>
+    </div>
+
+    <div id="heightPanel">
+        <div class="value" id="heightValue">0</div>
+        <div class="unit">米</div>
+    </div>
+
+    <div id="wishPopup">
+        <div class="wish-text" id="wishText"></div>
+        <div class="wish-sub">心愿已送达</div>
+    </div>
+
+    <button id="resetBtn">再放一个</button>
+
+    <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const wishInput = document.getElementById('wishInput');
+    const colorPicker = document.getElementById('colorPicker');
+    const releaseBtn = document.getElementById('releaseBtn');
+    const heightPanel = document.getElementById('heightPanel');
+    const heightValueEl = document.getElementById('heightValue');
+    const wishPopup = document.getElementById('wishPopup');
+    const wishTextEl = document.getElementById('wishText');
+    const resetBtn = document.getElementById('resetBtn');
+    const controlsEl = document.getElementById('controls');
+
+    const defaultColors = ['#FF6B35','#E84393','#00B894','#FDCB6E','#6C5CE7','#00CEC9','#E17055','#D63031','#0984E3','#FD79A8'];
+    colorPicker.value = defaultColors[Math.floor(Math.random() * defaultColors.length)];
+
+    let W, H, S;
+    function resize() {
+        const dpr = window.devicePixelRatio || 1;
+        W = window.innerWidth;
+        H = window.innerHeight;
+        S = Math.min(W, H) / 700;
+        canvas.width = W * dpr;
+        canvas.height = H * dpr;
+        canvas.style.width = W + 'px';
+        canvas.style.height = H + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    let state = 'idle';
+    let time = 0;
+    let lastTime = performance.now();
+
+    const balloon = {
+        worldY: 0, color: '#FF6B35', targetHeight: 5000,
+        speed: 1.5, swayAmp: 12, swayFreq: 0.015,
+        currentHeight: 0, wishText: '', scale: 1, glowPulse: 0,
+    };
+
+    const camera = { y: 0, targetY: 0 };
+
+    function groundScreenY() { return H - 90 * S; }
+    function w2s(worldY) { return groundScreenY() + camera.y - worldY; }
+
+    function hashSeed(text, color) {
+        let s = text + '|' + color;
+        let h = 5381;
+        for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+        return Math.abs(h);
+    }
+    function srand(seed) {
+        let x = Math.sin(seed * 9301 + 49297) * 233280;
+        return x - Math.floor(x);
+    }
+
+    let clouds = [], stars = [], flowers = [], particles = [], birds = [];
+
+    function initScene() {
+        clouds = [];
+        for (let i = 0; i < 30; i++) {
+            const numPuffs = 5 + Math.floor(Math.random() * 3);
+            const puffs = [];
+            const baseW = 60 + Math.random() * 80;
+            const baseH = 25 + Math.random() * 25;
+            for (let j = 0; j < numPuffs; j++) {
+                const t = numPuffs > 1 ? j / (numPuffs - 1) : 0.5;
+                const centerDist = Math.abs(t - 0.5) * 2;
+                const sizeFactor = 1 - centerDist * 0.4;
+                puffs.push({
+                    ox: (t - 0.5) * baseW * 0.6,
+                    oy: centerDist * baseH * 0.2 - baseH * 0.08 + (Math.random() - 0.5) * baseH * 0.08,
+                    r: baseH * (0.4 + 0.4 * sizeFactor + Math.random() * 0.1),
+                });
+            }
+            clouds.push({
+                x: Math.random() * W * 1.6 - W * 0.3,
+                worldY: 150 + Math.random() * 12000,
+                puffs,
+                speed: 0.12 + Math.random() * 0.35,
+                opacity: 0.35 + Math.random() * 0.45,
+                layer: Math.floor(Math.random() * 3),
+            });
+        }
+        stars = [];
+        for (let i = 0; i < 180; i++) {
+            stars.push({
+                x: Math.random() * W,
+                worldY: 2500 + Math.random() * 12000,
+                size: 0.4 + Math.random() * 2,
+                tSpeed: 0.8 + Math.random() * 3,
+                tOff: Math.random() * 6.28,
+            });
+        }
+        flowers = [];
+        for (let i = 0; i < 35; i++) {
+            flowers.push({
+                x: Math.random() * W,
+                color: ['#FF6B6B','#FFD93D','#FF8E53','#FF61A6','#E8A0BF'][Math.floor(Math.random()*5)],
+                size: 3 + Math.random() * 5,
+                phase: Math.random() * 6.28,
+            });
+        }
+        birds = [];
+        for (let i = 0; i < 6; i++) {
+            birds.push({
+                x: -60 - Math.random() * 400,
+                worldY: 400 + Math.random() * 4000,
+                speed: 0.8 + Math.random() * 1.8,
+                wingPhase: Math.random() * 6.28,
+                size: 6 + Math.random() * 7,
+            });
+        }
+    }
+    initScene();
+
+    function spawnParticles(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+            const a = Math.random() * 6.28;
+            const spd = 1 + Math.random() * 3.5;
+            particles.push({
+                x, y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd - 1.5,
+                life: 1, decay: 0.008 + Math.random() * 0.02,
+                size: 2 + Math.random() * 5, color,
+            });
+        }
+    }
+
+    function lerp(a, b, t) { return a + (b - a) * t; }
+
+    function drawSky() {
+        const alt = Math.max(0, camera.y);
+        const t = Math.min(1, alt / 7000);
+        const c1 = `rgb(${Math.round(lerp(255,8,t))},${Math.round(lerp(210,8,t))},${Math.round(lerp(160,30,t))})`;
+        const c2 = `rgb(${Math.round(lerp(140,15,t))},${Math.round(lerp(190,12,t))},${Math.round(lerp(240,40,t))})`;
+        const c3 = `rgb(${Math.round(lerp(50,6,t))},${Math.round(lerp(100,6,t))},${Math.round(lerp(180,22,t))})`;
+        const grad = ctx.createLinearGradient(0, 0, 0, H);
+        grad.addColorStop(0, c3);
+        grad.addColorStop(0.45, c2);
+        grad.addColorStop(1, c1);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+    }
+
+    function drawSun() {
+        const alt = Math.max(0, camera.y);
+        const opacity = Math.max(0, 1 - alt / 3000);
+        if (opacity <= 0) return;
+        const sx = W * 0.78, sy = groundScreenY() - 220 * S + camera.y * 0.55;
+        ctx.save();
+        ctx.globalAlpha = opacity;
+        const g3 = ctx.createRadialGradient(sx, sy, 0, sx, sy, 320 * S);
+        g3.addColorStop(0, 'rgba(255,220,120,0.2)');
+        g3.addColorStop(0.4, 'rgba(255,190,80,0.08)');
+        g3.addColorStop(1, 'rgba(255,150,50,0)');
+        ctx.fillStyle = g3;
+        ctx.fillRect(sx - 320 * S, sy - 320 * S, 640 * S, 640 * S);
+        const g2 = ctx.createRadialGradient(sx, sy, 0, sx, sy, 150 * S);
+        g2.addColorStop(0, 'rgba(255,240,170,0.5)');
+        g2.addColorStop(0.5, 'rgba(255,210,100,0.15)');
+        g2.addColorStop(1, 'rgba(255,170,60,0)');
+        ctx.fillStyle = g2;
+        ctx.beginPath(); ctx.arc(sx, sy, 150 * S, 0, 6.28); ctx.fill();
+        const g1 = ctx.createRadialGradient(sx, sy, 0, sx, sy, 60 * S);
+        g1.addColorStop(0, 'rgba(255,255,240,0.98)');
+        g1.addColorStop(0.5, 'rgba(255,235,150,0.8)');
+        g1.addColorStop(1, 'rgba(255,200,80,0)');
+        ctx.fillStyle = g1;
+        ctx.beginPath(); ctx.arc(sx, sy, 60 * S, 0, 6.28); ctx.fill();
+        ctx.fillStyle = 'rgba(255,252,235,0.95)';
+        ctx.beginPath(); ctx.arc(sx, sy, 32 * S, 0, 6.28); ctx.fill();
+        ctx.restore();
+    }
+
+    function drawMoon() {
+        const alt = Math.max(0, camera.y);
+        const opacity = Math.max(0, Math.min(1, (alt - 2500) / 2500));
+        if (opacity <= 0) return;
+        const mx = W * 0.22, my = 80;
+        ctx.save();
+        ctx.globalAlpha = opacity;
+        const g3 = ctx.createRadialGradient(mx, my, 0, mx, my, 200);
+        g3.addColorStop(0, 'rgba(180,200,255,0.2)');
+        g3.addColorStop(0.5, 'rgba(140,170,230,0.06)');
+        g3.addColorStop(1, 'rgba(100,130,200,0)');
+        ctx.fillStyle = g3;
+        ctx.fillRect(mx - 200, my - 200, 400, 400);
+        const g2 = ctx.createRadialGradient(mx, my, 0, mx, my, 90);
+        g2.addColorStop(0, 'rgba(200,215,255,0.35)');
+        g2.addColorStop(1, 'rgba(160,180,240,0)');
+        ctx.fillStyle = g2;
+        ctx.beginPath(); ctx.arc(mx, my, 90, 0, 6.28); ctx.fill();
+        const gm = ctx.createRadialGradient(mx - 6, my - 6, 0, mx, my, 36);
+        gm.addColorStop(0, '#f0eee6');
+        gm.addColorStop(0.7, '#ddd8cc');
+        gm.addColorStop(1, '#c8c0b4');
+        ctx.fillStyle = gm;
+        ctx.beginPath(); ctx.arc(mx, my, 36, 0, 6.28); ctx.fill();
+        ctx.fillStyle = 'rgba(160,150,135,0.3)';
+        ctx.beginPath(); ctx.arc(mx - 10, my - 6, 8, 0, 6.28); ctx.fill();
+        ctx.beginPath(); ctx.arc(mx + 12, my + 8, 5, 0, 6.28); ctx.fill();
+        ctx.beginPath(); ctx.arc(mx + 3, my - 14, 4, 0, 6.28); ctx.fill();
+        ctx.fillStyle = 'rgba(160,150,135,0.15)';
+        ctx.beginPath(); ctx.arc(mx - 5, my + 12, 6, 0, 6.28); ctx.fill();
+        ctx.restore();
+    }
+
+    function drawStars() {
+        const alt = Math.max(0, camera.y);
+        const baseOpacity = Math.max(0, Math.min(1, (alt - 2000) / 3000));
+        if (baseOpacity <= 0) return;
+        stars.forEach(s => {
+            const sy = w2s(s.worldY);
+            if (sy < -10 || sy > H + 10) return;
+            const twinkle = 0.5 + 0.5 * Math.sin(time * s.tSpeed + s.tOff);
+            ctx.globalAlpha = baseOpacity * twinkle;
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(s.x, sy, s.size, 0, 6.28); ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+    }
+
+    function drawClouds() {
+        clouds.forEach(c => {
+            const parallax = 0.25 + c.layer * 0.25;
+            const sy = w2s(c.worldY) + (1 - parallax) * camera.y * 0.5;
+            if (sy < -150 || sy > H + 150) return;
+            const altFade = Math.max(0.08, 1 - c.worldY / 15000);
+            ctx.globalAlpha = c.opacity * altFade;
+            const drift = Math.sin(time * 0.18 + c.worldY * 0.0005) * 8;
+            const altT = Math.min(1, c.worldY / 8000);
+            const cR = Math.round(lerp(255, 255, altT));
+            const cG = Math.round(lerp(240, 255, altT));
+            const cB = Math.round(lerp(220, 255, altT));
+            ctx.fillStyle = `rgba(${cR - 40},${cG - 30},${cB - 20},0.18)`;
+            ctx.beginPath();
+            c.puffs.forEach(p => {
+                const px = c.x + drift + p.ox * S;
+                const py = sy + p.oy * S;
+                const pr = Math.max(1, p.r * S);
+                ctx.moveTo(px + pr, py + 5 * S);
+                ctx.arc(px, py + 5 * S, pr, 0, 6.28);
+            });
+            ctx.fill();
+            ctx.fillStyle = `rgb(${cR},${cG},${cB})`;
+            ctx.beginPath();
+            c.puffs.forEach(p => {
+                const px = c.x + drift + p.ox * S;
+                const py = sy + p.oy * S;
+                const pr = Math.max(1, p.r * S);
+                ctx.moveTo(px + pr, py);
+                ctx.arc(px, py, pr, 0, 6.28);
+            });
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+    }
+
+    function drawBirds() {
+        birds.forEach(b => {
+            const sy = w2s(b.worldY);
+            if (sy < -40 || sy > H + 40) return;
+            const sz = b.size * S;
+            const wy = Math.sin(time * 6 + b.wingPhase) * sz * 0.6;
+            ctx.strokeStyle = 'rgba(50,40,30,0.5)';
+            ctx.lineWidth = Math.max(1, 1.5 * S);
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(b.x - sz, sy + wy);
+            ctx.quadraticCurveTo(b.x - sz * 0.3, sy - wy * 0.4, b.x, sy);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(b.x, sy);
+            ctx.quadraticCurveTo(b.x + sz * 0.3, sy - wy * 0.4, b.x + sz, sy + wy);
+            ctx.stroke();
+        });
+    }
+
+    function drawGround() {
+        const gy = w2s(0);
+        if (gy > H + 60) return;
+        const gg = ctx.createLinearGradient(0, gy, 0, gy + 180 * S);
+        gg.addColorStop(0, '#7ec850');
+        gg.addColorStop(0.15, '#6ab04c');
+        gg.addColorStop(1, '#4a8a3a');
+        ctx.fillStyle = gg;
+        ctx.fillRect(0, gy, W, H - gy + 200);
+        ctx.fillStyle = '#8fd460';
+        ctx.beginPath(); ctx.moveTo(0, gy);
+        for (let x = 0; x <= W; x += 15) {
+            ctx.lineTo(x, gy - 4 * S + Math.sin(x * 0.04 + time * 0.6) * 3 * S);
+        }
+        ctx.lineTo(W, gy + 8 * S); ctx.lineTo(0, gy + 8 * S);
+        ctx.closePath(); ctx.fill();
+        flowers.forEach(f => {
+            const fy = gy - 2 * S + Math.sin(f.x * 0.04 + time * 0.6) * 3 * S;
+            const sway = Math.sin(time * 1.8 + f.phase) * 3 * S;
+            const fs = f.size * S;
+            ctx.strokeStyle = '#4a8a3a'; ctx.lineWidth = Math.max(1, 1.5 * S);
+            ctx.beginPath(); ctx.moveTo(f.x, fy); ctx.lineTo(f.x + sway, fy - fs * 3); ctx.stroke();
+            ctx.fillStyle = f.color;
+            ctx.beginPath(); ctx.arc(f.x + sway, fy - fs * 3, fs, 0, 6.28); ctx.fill();
+            ctx.fillStyle = '#FFD93D';
+            ctx.beginPath(); ctx.arc(f.x + sway, fy - fs * 3, fs * 0.35, 0, 6.28); ctx.fill();
+        });
+    }
+
+    function drawChild(cx, footY, waving) {
+        ctx.save();
+        ctx.translate(cx, footY);
+        ctx.scale(S, S);
+
+        ctx.fillStyle = '#c0392b';
+        ctx.beginPath(); ctx.ellipse(-9, -2, 7, 4, 0, 0, 6.28); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(9, -2, 7, 4, 0, 0, 6.28); ctx.fill();
+
+        ctx.strokeStyle = '#ffd5b8'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-7, -4); ctx.lineTo(-9, -28); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(7, -4); ctx.lineTo(9, -28); ctx.stroke();
+
+        ctx.fillStyle = '#FF6B35';
+        ctx.beginPath();
+        ctx.moveTo(0, -58); ctx.lineTo(-17, -28); ctx.lineTo(-14, -26);
+        ctx.lineTo(14, -26); ctx.lineTo(17, -28); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(-13, -35); ctx.lineTo(13, -35); ctx.stroke();
+
+        ctx.fillStyle = '#ffd5b8';
+        ctx.beginPath(); ctx.arc(0, -72, 15, 0, 6.28); ctx.fill();
+        ctx.fillStyle = '#4a3728';
+        ctx.beginPath(); ctx.arc(0, -76, 15, Math.PI + 0.2, -0.2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(-3, -84, 12, 5, -0.15, 0, 6.28); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(12, -78);
+        ctx.quadraticCurveTo(22, -82, 18, -68);
+        ctx.quadraticCurveTo(16, -72, 12, -76);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255,140,140,0.4)';
+        ctx.beginPath(); ctx.ellipse(-10, -68, 5, 3, 0, 0, 6.28); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(10, -68, 5, 3, 0, 0, 6.28); ctx.fill();
+
+        ctx.fillStyle = '#2d2d2d';
+        if (waving) {
+            ctx.lineWidth = 2; ctx.strokeStyle = '#2d2d2d';
+            ctx.beginPath(); ctx.arc(-5, -74, 3, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+            ctx.beginPath(); ctx.arc(5, -74, 3, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+        } else {
+            ctx.beginPath(); ctx.arc(-5, -74, 2.5, 0, 6.28); ctx.fill();
+            ctx.beginPath(); ctx.arc(5, -74, 2.5, 0, 6.28); ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(-4, -75, 0.9, 0, 6.28); ctx.fill();
+            ctx.beginPath(); ctx.arc(6, -75, 0.9, 0, 6.28); ctx.fill();
+        }
+
+        ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+        if (waving) {
+            ctx.beginPath(); ctx.arc(0, -66, 5, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
+        } else {
+            ctx.beginPath(); ctx.arc(0, -68, 3.5, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
+        }
+
+        ctx.strokeStyle = '#ffd5b8'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+        if (waving) {
+            ctx.beginPath();
+            ctx.moveTo(-14, -45);
+            ctx.lineTo(-28 + Math.sin(time * 7) * 6, -62 + Math.cos(time * 7) * 4);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(14, -45);
+            ctx.lineTo(28 + Math.sin(time * 7 + 1) * 6, -62 + Math.cos(time * 7 + 1) * 4);
+            ctx.stroke();
+        } else {
+            ctx.beginPath(); ctx.moveTo(-14, -45); ctx.lineTo(-22, -32); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(14, -45); ctx.lineTo(20, -68); ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    function drawBalloonShape(x, y, color, scale) {
+        ctx.save();
+        ctx.translate(x, y);
+        const s = scale * S;
+        ctx.scale(s, s);
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 28 + Math.sin(time * 2) * 5;
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.ellipse(0, 0, 22, 28, 0, 0, 6.28); ctx.fill();
+        ctx.shadowBlur = 0;
+        const hl = ctx.createRadialGradient(-7, -10, 1, -7, -10, 14);
+        hl.addColorStop(0, 'rgba(255,255,255,0.45)');
+        hl.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = hl;
+        ctx.beginPath(); ctx.ellipse(-7, -10, 9, 13, -0.3, 0, 6.28); ctx.fill();
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.moveTo(-4, 26); ctx.lineTo(4, 26); ctx.lineTo(0, 33); ctx.closePath(); ctx.fill();
+        if (balloon.wishText && state !== 'idle') {
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            ctx.font = `${Math.max(8, 11)}px "ZCOOL KuaiLe", cursive`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            const dt = balloon.wishText.length > 5 ? balloon.wishText.substring(0, 5) + '..' : balloon.wishText;
+            ctx.fillText(dt, 0, 2);
+        }
+        ctx.restore();
+    }
+
+    function drawRope(x1, y1, x2, y2) {
+        const dy = Math.abs(y2 - y1);
+        if (dy < 3) return;
+        ctx.strokeStyle = '#8B7355'; ctx.lineWidth = Math.max(1, 1.3 * S);
+        ctx.beginPath();
+        for (let i = 0; i <= 18; i++) {
+            const t = i / 18;
+            const rx = x1 + (x2 - x1) * t + Math.sin(t * 5 + time * 2.5) * 3 * S * Math.sin(t * Math.PI);
+            const ry = y1 + (y2 - y1) * t;
+            if (i === 0) ctx.moveTo(rx, ry); else ctx.lineTo(rx, ry);
+        }
+        ctx.stroke();
+    }
+
+    function drawParticles() {
+        particles.forEach(p => {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, Math.max(0.5, p.size * p.life * S), 0, 6.28);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+    }
+
+    function update(dt) {
+        time += dt;
+
+        if (state === 'flying') {
+            balloon.worldY += balloon.speed * 150 * dt;
+            balloon.currentHeight = balloon.worldY * 0.7;
+
+            if (balloon.currentHeight >= balloon.targetHeight) {
+                balloon.currentHeight = balloon.targetHeight;
+                balloon.worldY = balloon.targetHeight / 0.7;
+                state = 'done';
+                balloon.glowPulse = 0;
+                const bsx = W / 2 + Math.sin(time * balloon.swayFreq * 60) * balloon.swayAmp * S;
+                const bsyNow = w2s(balloon.worldY);
+                spawnParticles(bsx, bsyNow, balloon.color, 45);
+                spawnParticles(bsx, bsyNow, '#FFD700', 30);
+                spawnParticles(bsx, bsyNow, '#fff', 15);
+                wishTextEl.textContent = '"' + balloon.wishText + '"';
+                setTimeout(() => wishPopup.classList.add('visible'), 600);
+                setTimeout(() => resetBtn.classList.add('visible'), 2000);
+            }
+
+            heightValueEl.textContent = Math.round(balloon.currentHeight);
+
+            const bsy = w2s(balloon.worldY);
+            if (bsy < H * 0.4) {
+                camera.targetY = balloon.worldY - (groundScreenY() - H * 0.4);
+            }
+            camera.targetY = Math.max(0, camera.targetY);
+            camera.y += (camera.targetY - camera.y) * 0.04;
+
+            if (Math.random() < 0.4) {
+                const sway = Math.sin(time * balloon.swayFreq * 60) * balloon.swayAmp * S;
+                particles.push({
+                    x: W / 2 + sway + (Math.random() - 0.5) * 12 * S,
+                    y: w2s(balloon.worldY) + 36 * S,
+                    vx: (Math.random() - 0.5) * 0.4,
+                    vy: 0.3 + Math.random() * 0.6,
+                    life: 1, decay: 0.015 + Math.random() * 0.02,
+                    size: 1.5 + Math.random() * 3,
+                    color: balloon.color,
+                });
+            }
+        }
+
+        if (state === 'done') {
+            balloon.glowPulse += dt;
+        }
+
+        camera.y += (camera.targetY - camera.y) * 0.03;
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx; p.y += p.vy; p.life -= p.decay;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        clouds.forEach(c => { c.x += c.speed * 0.25; if (c.x > W + 300) c.x = -300; });
+        birds.forEach(b => {
+            b.x += b.speed * 0.6;
+            if (b.x > W + 120) { b.x = -120; b.worldY = 400 + Math.random() * 4000; }
+        });
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, W, H);
+        drawSky();
+        drawSun();
+        drawMoon();
+        drawStars();
+        drawClouds();
+        drawBirds();
+        drawGround();
+
+        const childX = W / 2;
+        const childFootY = w2s(0);
+        const childVisible = childFootY < H + 120 * S && childFootY > -200 * S;
+        const waving = state === 'flying' || state === 'done';
+        if (childVisible) drawChild(childX, childFootY, waving);
+
+        if (state === 'idle') {
+            const sway = Math.sin(time * 1.5) * 4 * S;
+            const bx = childX + 20 * S + sway;
+            const by = childFootY - 105 * S + Math.sin(time * 2) * 2 * S;
+            drawRope(bx, by + 33 * balloon.scale * S, childX + 20 * S, childFootY - 68 * S);
+            drawBalloonShape(bx, by, colorPicker.value, balloon.scale);
+        } else {
+            const sway = Math.sin(time * balloon.swayFreq * 60) * balloon.swayAmp * S;
+            const bx = W / 2 + sway;
+            const by = w2s(balloon.worldY);
+            const ropeLen = Math.min(160, 30 + balloon.currentHeight * 0.015) * S;
+            drawRope(bx, by + 33 * balloon.scale * S, bx + Math.sin(time * 2) * 3 * S, by + 33 * balloon.scale * S + ropeLen);
+            let s = balloon.scale;
+            if (state === 'done') s *= 1 + Math.sin(balloon.glowPulse * 3) * 0.08;
+            drawBalloonShape(bx, by, balloon.color, s);
+        }
+
+        drawParticles();
+    }
+
+    function loop(now) {
+        const dt = Math.min(0.05, (now - lastTime) / 1000);
+        lastTime = now;
+        update(dt);
+        draw();
+        requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+
+    function doRelease() {
+        const wish = wishInput.value.trim() || '小小的心愿';
+        const color = colorPicker.value;
+        const seed = hashSeed(wish, color);
+        balloon.targetHeight = 1000 + srand(seed) * 9000;
+        balloon.speed = 1.0 + srand(seed + 1) * 1.2;
+        balloon.swayAmp = 8 + srand(seed + 2) * 18;
+        balloon.swayFreq = 0.008 + srand(seed + 3) * 0.018;
+        balloon.color = color;
+        balloon.wishText = wish;
+        balloon.worldY = 0;
+        balloon.currentHeight = 0;
+        balloon.scale = 1;
+        balloon.glowPulse = 0;
+        state = 'flying';
+        controlsEl.classList.add('hidden');
+        heightPanel.classList.add('visible');
+        spawnParticles(W / 2 + 20 * S, w2s(0) - 68 * S, color, 25);
+        spawnParticles(W / 2 + 20 * S, w2s(0) - 68 * S, '#FFD700', 12);
+    }
+
+    function doReset() {
+        state = 'idle';
+        balloon.worldY = 0;
+        balloon.currentHeight = 0;
+        camera.y = 0;
+        camera.targetY = 0;
+        particles = [];
+        controlsEl.classList.remove('hidden');
+        heightPanel.classList.remove('visible');
+        wishPopup.classList.remove('visible');
+        resetBtn.classList.remove('visible');
+        colorPicker.value = defaultColors[Math.floor(Math.random() * defaultColors.length)];
+    }
+
+    releaseBtn.addEventListener('click', doRelease);
+    resetBtn.addEventListener('click', doReset);
+    wishInput.addEventListener('keydown', e => { if (e.key === 'Enter') doRelease(); });
+    </script>
+</body>
+</html>
